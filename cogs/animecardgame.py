@@ -1433,6 +1433,53 @@ class AnimeCollect(commands.Cog):
         view.add_item(cancel_button)
         
         await interaction.response.send_message(embed=embed, view=view)
+    @nextcord.slash_command(name="take", description="Remove credits from a user's balance (Server owner only)")
+    async def take(
+        self, 
+        interaction: nextcord.Interaction,
+        user: nextcord.Member = nextcord.SlashOption(
+            name="user",
+            description="User to remove credits from",
+            required=True
+        ),
+        amount: int = nextcord.SlashOption(
+            name="amount",
+            description="Amount of credits to remove",
+            required=True,
+            min_value=1
+        )
+    ):
+        """Remove credits from a user's balance (Server owner only)"""
+        server_id = interaction.guild_id
+        
+        # Check if the command user is the server owner
+        if interaction.user.id != interaction.guild.owner_id:
+            await interaction.response.send_message("This command can only be used by the server owner!", ephemeral=True)
+            return
+        
+        # Ensure the target user exists in the database
+        self.ensure_user_exists(user.id, server_id)
+        
+        # Get current balance
+        current_balance = self.get_user_balance(user.id, server_id)
+        
+        # Make sure they have enough to take
+        if current_balance < amount:
+            await interaction.response.send_message(
+                f"{user.display_name} only has {current_balance} credits. You can't take {amount} credits.",
+                ephemeral=True
+            )
+            return
+        
+        # Remove the credits (update balance with negative amount)
+        new_balance = self.update_user_balance(user.id, server_id, -amount)
+        
+        # Send confirmation message
+        await interaction.response.send_message(
+            f"Removed {amount} credits from {user.mention}'s balance.\n"
+            f"Previous balance: {current_balance} credits\n"
+            f"New balance: {new_balance} credits"
+        )    
 
 def setup(bot):
     bot.add_cog(AnimeCollect(bot))
