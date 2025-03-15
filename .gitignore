@@ -1,0 +1,18 @@
+# Ignore environment files
+.env
+tkn.env
+
+# Ignore database files
+*.db
+*.sqlite
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore JSON files
+*.json
+
+
