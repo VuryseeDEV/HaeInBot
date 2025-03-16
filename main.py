@@ -12,19 +12,16 @@ intents = nextcord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True  
-
+intents.presences = True  
 bot = commands.Bot(command_prefix="$", intents=intents)
 
 async def set_rich_presence():
     activity = nextcord.Activity(
         type=nextcord.ActivityType.watching,
-        name="YouTube",
-        details="",
-        party_size=(1, 100),
-        url="https://github.com/VuryseeDEV/scipio_bot/tree/main"  
-    )
+        name="Check my GitHub",
+        state="Click here!",
+        url="https://www.youtube.com/@vurye")
     await bot.change_presence(activity=activity)
-
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")

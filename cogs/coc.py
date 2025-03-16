@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv("tkn.env")
+token = os.getenv("COC_API_KEY")
 
 class ClashOfClans(commands.Cog):
     """

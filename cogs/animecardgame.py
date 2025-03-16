@@ -79,6 +79,15 @@ class AnimeCollect(commands.Cog):
                 request_char_id INTEGER,
                 FOREIGN KEY (trade_id) REFERENCES trades (trade_id)
             )
+            ''',
+            '''
+            CREATE TABLE IF NOT EXISTS rewards_cooldown (
+                user_id INTEGER,
+                server_id INTEGER,
+                last_daily INTEGER DEFAULT 0,
+                last_weekly INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, server_id)
+            )
             '''
         ]
         
@@ -1480,6 +1489,449 @@ class AnimeCollect(commands.Cog):
             f"Previous balance: {current_balance} credits\n"
             f"New balance: {new_balance} credits"
         )    
+    @nextcord.slash_command(name="daily", description="Claim your daily credits")
+    async def daily(self, interaction: nextcord.Interaction):
+        """Claim daily credits (once every 24 hours)"""
+        user_id = interaction.user.id
+        server_id = interaction.guild_id
+        self.ensure_user_exists(user_id, server_id)
+        
+        # Set up the rewards table if it doesn't exist
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rewards_cooldown (
+                user_id INTEGER,
+                server_id INTEGER,
+                last_daily INTEGER DEFAULT 0,
+                last_weekly INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, server_id)
+            )
+        ''')
+        self.conn.commit()
+        
+        # Make sure user exists in rewards table
+        self.cursor.execute(
+            "SELECT user_id FROM rewards_cooldown WHERE user_id = ? AND server_id = ?", 
+            (user_id, server_id)
+        )
+        if not self.cursor.fetchone():
+            self.cursor.execute(
+                "INSERT INTO rewards_cooldown (user_id, server_id, last_daily, last_weekly) VALUES (?, ?, 0, 0)", 
+                (user_id, server_id)
+            )
+            self.conn.commit()
+        
+        # Get the last claim time
+        self.cursor.execute(
+            "SELECT last_daily FROM rewards_cooldown WHERE user_id = ? AND server_id = ?", 
+            (user_id, server_id)
+        )
+        last_claim = self.cursor.fetchone()[0]
+        current_time = int(time.time())
+        daily_cooldown = 86400  # 24 hours
+        daily_amount = 250
+        
+        # Check if enough time has passed
+        if current_time - last_claim < daily_cooldown:
+            # Calculate time remaining
+            time_left = daily_cooldown - (current_time - last_claim)
+            hours, remainder = divmod(time_left, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            time_str = f"{hours}h {minutes}m {seconds}s"
+            
+            await interaction.response.send_message(
+                f"❌ You've already claimed your daily credits. You can claim again in {time_str}.",
+                ephemeral=True
+            )
+            return
+        
+        # Update last claim time
+        self.cursor.execute(
+            "UPDATE rewards_cooldown SET last_daily = ? WHERE user_id = ? AND server_id = ?", 
+            (current_time, user_id, server_id)
+        )
+        
+        # Add credits to user balance
+        new_balance = self.update_user_balance(user_id, server_id, daily_amount)
+        
+        # Create embed
+        embed = nextcord.Embed(
+            title="Daily Credits Claimed!",
+            description=f"You've received {daily_amount} credits!",
+            color=0x00FF00
+        )
+        
+        embed.add_field(name="Current Balance", value=f"{new_balance} credits", inline=False)
+        next_claim = datetime.datetime.fromtimestamp(current_time + daily_cooldown).strftime('%Y-%m-%d %H:%M:%S')
+        embed.set_footer(text=f"Next claim available: {next_claim}")
+        
+        await interaction.response.send_message(embed=embed)
+        self.conn.commit()
 
+    @nextcord.slash_command(name="weekly", description="Claim your weekly credits")
+    async def weekly(self, interaction: nextcord.Interaction):
+        """Claim weekly credits (once every 7 days)"""
+        user_id = interaction.user.id
+        server_id = interaction.guild_id
+        self.ensure_user_exists(user_id, server_id)
+        
+        # Set up the rewards table if it doesn't exist
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rewards_cooldown (
+                user_id INTEGER,
+                server_id INTEGER,
+                last_daily INTEGER DEFAULT 0,
+                last_weekly INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, server_id)
+            )
+        ''')
+        self.conn.commit()
+        
+        # Make sure user exists in rewards table
+        self.cursor.execute(
+            "SELECT user_id FROM rewards_cooldown WHERE user_id = ? AND server_id = ?", 
+            (user_id, server_id)
+        )
+        if not self.cursor.fetchone():
+            self.cursor.execute(
+                "INSERT INTO rewards_cooldown (user_id, server_id, last_daily, last_weekly) VALUES (?, ?, 0, 0)", 
+                (user_id, server_id)
+            )
+            self.conn.commit()
+        
+        # Get the last claim time
+        self.cursor.execute(
+            "SELECT last_weekly FROM rewards_cooldown WHERE user_id = ? AND server_id = ?", 
+            (user_id, server_id)
+        )
+        last_claim = self.cursor.fetchone()[0]
+        current_time = int(time.time())
+        weekly_cooldown = 604800  # 7 days
+        weekly_amount = 1000
+        
+        # Check if enough time has passed
+        if current_time - last_claim < weekly_cooldown:
+            # Calculate time remaining
+            time_left = weekly_cooldown - (current_time - last_claim)
+            days, remainder = divmod(time_left, 86400)
+            hours, remainder = divmod(remainder, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            time_str = f"{days}d {hours}h {minutes}m {seconds}s"
+            
+            await interaction.response.send_message(
+                f"❌ You've already claimed your weekly credits. You can claim again in {time_str}.",
+                ephemeral=True
+            )
+            return
+        
+        # Update last claim time
+        self.cursor.execute(
+            "UPDATE rewards_cooldown SET last_weekly = ? WHERE user_id = ? AND server_id = ?", 
+            (current_time, user_id, server_id)
+        )
+        
+        # Add credits to user balance
+        new_balance = self.update_user_balance(user_id, server_id, weekly_amount)
+        
+        # Create embed
+        embed = nextcord.Embed(
+            title="Weekly Credits Claimed!",
+            description=f"You've received {weekly_amount} credits!",
+            color=0x00FF00
+        )
+        
+        embed.add_field(name="Current Balance", value=f"{new_balance} credits", inline=False)
+        next_claim = datetime.datetime.fromtimestamp(current_time + weekly_cooldown).strftime('%Y-%m-%d %H:%M:%S')
+        embed.set_footer(text=f"Next claim available: {next_claim}")
+        
+        await interaction.response.send_message(embed=embed)
+        self.conn.commit()
+
+
+    @nextcord.slash_command(name="gamble", description="Gamble your credits by guessing a number")
+    async def gamble(
+        self, 
+        interaction: nextcord.Interaction,
+        amount: int = nextcord.SlashOption(
+            name="amount",
+            description="Amount of credits to gamble",
+            required=True,
+            min_value=1
+        ),
+        guess: int = nextcord.SlashOption(
+            name="guess",
+            description="Guess a number between 1 and 3",
+            required=True,
+            min_value=1,
+            max_value=3
+        )
+    ):
+        """Gamble credits by guessing a number between 1 and 3. Win triple your bet if correct!"""
+        user_id = interaction.user.id
+        server_id = interaction.guild_id
+        self.ensure_user_exists(user_id, server_id)
+        
+        # Get current balance
+        current_balance = self.get_user_balance(user_id, server_id)
+        
+        # Check if user has enough credits
+        if current_balance < amount:
+            await interaction.response.send_message(
+                f"You don't have enough credits to gamble that amount! Your balance: {current_balance} credits.",
+                ephemeral=True
+            )
+            return
+        
+        # Generate a random number between 1 and 3
+        import secrets
+        correct_number = secrets.randbelow(3) + 1  # 1, 2, or 3
+        
+        # Check if user's guess is correct
+        if guess == correct_number:
+            # User wins triple their bet (since it's a 1/3 chance)
+            winnings = amount * 2  # They get their bet back plus 2x more
+            new_balance = self.update_user_balance(user_id, server_id, winnings)
+            
+            embed = nextcord.Embed(
+                title="🎉 You Won!",
+                description=f"Congratulations! The number was {correct_number}.\nYou've won {winnings} credits!",
+                color=0x00FF00
+            )
+            embed.add_field(name="Your Guess", value=f"{guess}", inline=True)
+            embed.add_field(name="Lucky Number", value=f"{correct_number}", inline=True)
+            embed.add_field(name="New Balance", value=f"{new_balance} credits", inline=True)
+            
+        else:
+            # User loses their bet
+            new_balance = self.update_user_balance(user_id, server_id, -amount)
+            
+            embed = nextcord.Embed(
+                title="💸 You Lost",
+                description=f"Sorry, the number was {correct_number}, not {guess}.\nYou've lost {amount} credits.",
+                color=0xFF0000
+            )
+            embed.add_field(name="Your Guess", value=f"{guess}", inline=True)
+            embed.add_field(name="Lucky Number", value=f"{correct_number}", inline=True)
+            embed.add_field(name="New Balance", value=f"{new_balance} credits", inline=True)
+        
+        # Add a funny message based on win/loss
+        if guess == correct_number:
+            embed.set_footer(text=random.choice([
+                "Lucky guess!",
+                "You must be psychic!",
+                "The odds were in your favor!",
+                "Want to try your luck again?",
+                "Fortune favors the bold!"
+            ]))
+        else:
+            embed.set_footer(text=random.choice([
+                "So close, yet so far!",
+                "Better luck next time!",
+                "The house always wins... eventually.",
+                "Maybe your lucky number is different?",
+                "Keep trying, luck changes!"
+            ]))
+    
+        await interaction.response.send_message(embed=embed)
+
+    @nextcord.slash_command(name="challenge", description="Challenge another user to a gambling match")
+    async def challenge(
+        self,
+        interaction: nextcord.Interaction,
+        user: nextcord.Member = nextcord.SlashOption(
+            name="user",
+            description="User to challenge",
+            required=True
+        ),
+        amount: int = nextcord.SlashOption(
+            name="amount",
+            description="Amount of credits to bet",
+            required=True,
+            min_value=10
+        )
+    ):
+        """Challenge another user to a gambling duel. Winner takes all."""
+        challenger_id = interaction.user.id
+        target_id = user.id
+        server_id = interaction.guild_id
+        
+        # Check if user is challenging themselves
+        if challenger_id == target_id:
+            await interaction.response.send_message("You cannot challenge yourself!", ephemeral=True)
+            return
+        
+        # Ensure both users exist in database
+        self.ensure_user_exists(challenger_id, server_id)
+        self.ensure_user_exists(target_id, server_id)
+        
+        # Check if challenger has enough credits
+        challenger_balance = self.get_user_balance(challenger_id, server_id)
+        if challenger_balance < amount:
+            await interaction.response.send_message(
+                f"You don't have enough credits for this challenge! Your balance: {challenger_balance} credits.",
+                ephemeral=True
+            )
+            return
+        
+        # Create challenge embed
+        embed = nextcord.Embed(
+            title="💰 Gambling Challenge! 💰",
+            description=f"{interaction.user.mention} has challenged {user.mention} to a gambling duel!",
+            color=0xFFD700  # Gold color
+        )
+        embed.add_field(
+            name="Stakes",
+            value=f"{amount} credits from each player\nWinner takes all: {amount * 2} credits",
+            inline=False
+        )
+        embed.add_field(
+            name=f"{interaction.user.display_name}'s Balance",
+            value=f"{challenger_balance} credits",
+            inline=True
+        )
+        
+        target_balance = self.get_user_balance(target_id, server_id)
+        embed.add_field(
+            name=f"{user.display_name}'s Balance",
+            value=f"{target_balance} credits",
+            inline=True
+        )
+        
+        # Check if target has enough credits and show warning if not
+        if target_balance < amount:
+            embed.add_field(
+                name="⚠️ Warning",
+                value=f"{user.display_name} doesn't have enough credits for this challenge!",
+                inline=False
+            )
+        
+        # Create view with accept/decline buttons
+        view = nextcord.ui.View(timeout=60)  # 1 minute timeout
+        
+        accept_button = nextcord.ui.Button(
+            label="Accept Challenge",
+            style=nextcord.ButtonStyle.green,
+            disabled=target_balance < amount  # Disable if target doesn't have enough credits
+        )
+        
+        decline_button = nextcord.ui.Button(
+            label="Decline Challenge",
+            style=nextcord.ButtonStyle.red
+        )
+        
+        async def accept_callback(button_interaction):
+            # Verify the person clicking is the challenged user
+            if button_interaction.user.id != target_id:
+                await button_interaction.response.send_message("This challenge isn't for you to accept!", ephemeral=True)
+                return
+            
+            # Recheck balances to ensure both users still have enough credits
+            current_challenger_balance = self.get_user_balance(challenger_id, server_id)
+            current_target_balance = self.get_user_balance(target_id, server_id)
+            
+            if current_challenger_balance < amount:
+                await button_interaction.response.send_message(
+                    f"{interaction.user.display_name} no longer has enough credits for this challenge!",
+                    ephemeral=False
+                )
+                return
+                
+            if current_target_balance < amount:
+                await button_interaction.response.send_message(
+                    f"You don't have enough credits for this challenge!",
+                    ephemeral=True
+                )
+                return
+            
+            # Deduct stakes from both users
+            self.update_user_balance(challenger_id, server_id, -amount)
+            self.update_user_balance(target_id, server_id, -amount)
+            
+            # Determine winner (50/50 chance)
+            if random.random() >= 0.5:
+                winner_id = challenger_id
+                winner_mention = interaction.user.mention
+                winner_name = interaction.user.display_name
+                loser_mention = user.mention
+                loser_name = user.display_name
+            else:
+                winner_id = target_id
+                winner_mention = user.mention
+                winner_name = user.display_name
+                loser_mention = interaction.user.mention
+                loser_name = interaction.user.display_name
+            
+            # Award the pot to the winner
+            self.update_user_balance(winner_id, server_id, amount * 2)
+            
+            # Create result embed
+            result_embed = nextcord.Embed(
+                title="🎲 Gambling Results 🎲",
+                description=f"The challenge between {interaction.user.mention} and {user.mention} is complete!",
+                color=0x00FF00
+            )
+            
+            result_embed.add_field(
+                name="Winner",
+                value=f"🏆 {winner_mention} won {amount * 2} credits! 🏆",
+                inline=False
+            )
+            
+            # Add some flavor text
+            flavor_texts = [
+                f"{winner_name} had luck on their side today!",
+                f"{loser_name} watches in disbelief as {winner_name} takes all the credits!",
+                f"Lady Luck smiles upon {winner_name}!",
+                f"The dice have spoken, and {winner_name} is victorious!",
+                f"{winner_name}'s pockets are now {amount} credits heavier!"
+            ]
+            
+            result_embed.add_field(
+                name="Details",
+                value=random.choice(flavor_texts),
+                inline=False
+            )
+            
+            # Update the message with results
+            await interaction.edit_original_message(
+                content=f"{winner_mention} has won the gambling challenge!",
+                embed=result_embed,
+                view=None
+            )
+        
+        async def decline_callback(button_interaction):
+            # Verify the person clicking is the challenged user
+            if button_interaction.user.id != target_id:
+                await button_interaction.response.send_message("This challenge isn't for you to decline!", ephemeral=True)
+                return
+            
+            # Create declined embed
+            declined_embed = nextcord.Embed(
+                title="Challenge Declined",
+                description=f"{user.mention} has declined the gambling challenge from {interaction.user.mention}.",
+                color=0xFF0000
+            )
+            
+            # Update the message
+            await interaction.edit_original_message(
+                content=f"Challenge declined by {user.mention}",
+                embed=declined_embed,
+                view=None
+            )
+        
+        # Assign callbacks
+        accept_button.callback = accept_callback
+        decline_button.callback = decline_callback
+        
+        # Add buttons to view
+        view.add_item(accept_button)
+        view.add_item(decline_button)
+        
+        # Send the challenge
+        await interaction.response.send_message(
+            content=f"{user.mention}, you've been challenged to a gambling duel!",
+            embed=embed,
+            view=view
+        )
+   
 def setup(bot):
     bot.add_cog(AnimeCollect(bot))

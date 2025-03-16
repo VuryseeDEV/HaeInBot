@@ -9,7 +9,7 @@ class Source(commands.Cog):
     @commands.command(name="source")
     async def source(self, ctx):
         # Replace this with your GitHub repository link
-        github_repo_url = "https://github.com/VuryseeDEV/scipio_bot/tree/main"
+        github_repo_url = "https://github.com/VuryseeDEV/HaeInBot/tree/main"
 
         # Create the embed
         embed = Embed(
