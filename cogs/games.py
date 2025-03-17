@@ -6,9 +6,9 @@ class GameCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-#
-#ROCK PAPER SCISSORS GAME
-#
+    #
+    #ROCK PAPER SCISSORS GAME
+    #
     @commands.command(name="rps", help="Play Rock, Paper, Scissors. Choose one: rock, paper, or scissors.")
     async def rps(self, ctx, player_choice: str):
         # Define the choices
@@ -36,9 +36,9 @@ class GameCommands(commands.Cog):
         # Send the result to the channel
         await ctx.send(f"You chose {player_choice}. I chose {bot_choice}. {result}")
 
-            #
-            # MAGIC 8 BALL GAME
-            #
+    #
+    # MAGIC 8 BALL GAME
+    #
     @commands.command(name="8ball", help="Ask the magic 8 ball a question.")
     async def eightball(self, ctx, *, question: str):
         responses = [
@@ -64,11 +64,29 @@ class GameCommands(commands.Cog):
             "Very doubtful."
         ]
             
-        # Bot makes a random choice
+        
         response = random.choice(responses)
             
         # Send the response to the channel
         await ctx.send(f"**Question:** {question}\n**Answer:** {response}")
+    
+    #
+    # IS GAY COMMAND
+    #
+    @commands.command(name="isgay", help="Check if a user is gay with a random percentage. Usage: $isgay [@user]")
+    async def isgay(self, ctx, user: nextcord.Member = None):
+        # If no user is specified, use the command author
+        if user is None:
+            user = ctx.author
+        
+        
+        is_gay = random.choice([True, False])
+        
+        if is_gay:
+            percentage = random.randint(1, 120)
+            await ctx.send(f"{user.mention} is {percentage}% gay.")
+        else:
+            await ctx.send(f"{user.mention} is not gay.")
 
 def setup(bot):
     bot.add_cog(GameCommands(bot))

@@ -453,7 +453,7 @@ class RulesButtonView(nextcord.ui.View):
         for i, button_data in enumerate(buttons):
             # Create a button with the label
             button = nextcord.ui.Button(
-                style=nextcord.ButtonStyle.primary,
+                style=nextcord.ButtonStyle.secondary,
                 label=button_data["label"],
                 custom_id=f"rules_button_{i}"
             )
